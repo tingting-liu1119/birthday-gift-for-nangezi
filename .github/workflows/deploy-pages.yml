@@ -1,0 +1,64 @@
+name: Deploy birthday gift to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the birthday gift
+        uses: actions/checkout@v4
+
+      - name: Prepare pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Prepare Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: birthday-gift-for-nangezi/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: birthday-gift-for-nangezi
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the static gift
+        working-directory: birthday-gift-for-nangezi
+        run: pnpm build:github
+        env:
+          NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+          NEXT_PUBLIC_SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload the finished site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: birthday-gift-for-nangezi/out
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Publish GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
